@@ -1,0 +1,300 @@
+//
+//  SettingsStore.swift
+//  BetterCapture
+//
+//  Created by Joshua Sattler on 29.01.26.
+//
+
+import Foundation
+
+/// Video codec options for recording
+enum VideoCodec: String, CaseIterable, Identifiable {
+    case h264 = "H.264"
+    case hevc = "H.265"
+    case proRes422 = "ProRes 422"
+    case proRes4444 = "ProRes 4444"
+
+    var id: String { rawValue }
+
+    /// Whether this codec supports alpha channel capture
+    var supportsAlphaChannel: Bool {
+        switch self {
+        case .hevc, .proRes4444:
+            return true
+        case .h264, .proRes422:
+            return false
+        }
+    }
+}
+
+/// Container format for output files
+enum ContainerFormat: String, CaseIterable, Identifiable {
+    case mov = "mov"
+    case mp4 = "mp4"
+
+    var id: String { rawValue }
+
+    var fileExtension: String { rawValue }
+}
+
+/// Audio codec options
+enum AudioCodec: String, CaseIterable, Identifiable {
+    case aac = "AAC"
+    case pcm = "PCM"
+
+    var id: String { rawValue }
+}
+
+/// Frame rate options for recording
+enum FrameRate: Int, CaseIterable, Identifiable {
+    case native = 0
+    case fps24 = 24
+    case fps30 = 30
+    case fps60 = 60
+
+    var id: Int { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .native:
+            return "Native"
+        default:
+            return "\(rawValue) fps"
+        }
+    }
+}
+
+/// Persists user preferences using AppStorage
+@MainActor
+@Observable
+final class SettingsStore {
+
+    // MARK: - Video Settings
+
+    var frameRate: FrameRate {
+        get {
+            FrameRate(rawValue: frameRateRaw) ?? .fps60
+        }
+        set {
+            frameRateRaw = newValue.rawValue
+        }
+    }
+
+    var videoCodec: VideoCodec {
+        get {
+            VideoCodec(rawValue: videoCodecRaw) ?? .hevc
+        }
+        set {
+            videoCodecRaw = newValue.rawValue
+            // Reset alpha channel setting if the new codec doesn't support it
+            if !newValue.supportsAlphaChannel {
+                captureAlphaChannel = false
+            }
+        }
+    }
+
+    var containerFormat: ContainerFormat {
+        get {
+            ContainerFormat(rawValue: containerFormatRaw) ?? .mov
+        }
+        set {
+            containerFormatRaw = newValue.rawValue
+        }
+    }
+
+    var captureAlphaChannel: Bool {
+        get {
+            access(keyPath: \.captureAlphaChannel)
+            return UserDefaults.standard.bool(forKey: "captureAlphaChannel")
+        }
+        set {
+            withMutation(keyPath: \.captureAlphaChannel) {
+                UserDefaults.standard.set(newValue, forKey: "captureAlphaChannel")
+            }
+        }
+    }
+
+    // MARK: - Audio Settings
+
+    var captureMicrophone: Bool {
+        get {
+            access(keyPath: \.captureMicrophone)
+            return UserDefaults.standard.bool(forKey: "captureMicrophone")
+        }
+        set {
+            withMutation(keyPath: \.captureMicrophone) {
+                UserDefaults.standard.set(newValue, forKey: "captureMicrophone")
+            }
+        }
+    }
+
+    var captureSystemAudio: Bool {
+        get {
+            access(keyPath: \.captureSystemAudio)
+            return UserDefaults.standard.bool(forKey: "captureSystemAudio")
+        }
+        set {
+            withMutation(keyPath: \.captureSystemAudio) {
+                UserDefaults.standard.set(newValue, forKey: "captureSystemAudio")
+            }
+        }
+    }
+
+    var audioCodec: AudioCodec {
+        get {
+            AudioCodec(rawValue: audioCodecRaw) ?? .aac
+        }
+        set {
+            audioCodecRaw = newValue.rawValue
+        }
+    }
+
+    var selectedMicrophoneID: String? {
+        get {
+            access(keyPath: \.selectedMicrophoneID)
+            return UserDefaults.standard.string(forKey: "selectedMicrophoneID")
+        }
+        set {
+            withMutation(keyPath: \.selectedMicrophoneID) {
+                UserDefaults.standard.set(newValue, forKey: "selectedMicrophoneID")
+            }
+        }
+    }
+
+    // MARK: - Content Filter Settings
+
+    var showCursor: Bool {
+        get {
+            access(keyPath: \.showCursor)
+            return UserDefaults.standard.object(forKey: "showCursor") as? Bool ?? true
+        }
+        set {
+            withMutation(keyPath: \.showCursor) {
+                UserDefaults.standard.set(newValue, forKey: "showCursor")
+            }
+        }
+    }
+
+    var showWallpaper: Bool {
+        get {
+            access(keyPath: \.showWallpaper)
+            return UserDefaults.standard.object(forKey: "showWallpaper") as? Bool ?? true
+        }
+        set {
+            withMutation(keyPath: \.showWallpaper) {
+                UserDefaults.standard.set(newValue, forKey: "showWallpaper")
+            }
+        }
+    }
+
+    var showMenuBar: Bool {
+        get {
+            access(keyPath: \.showMenuBar)
+            return UserDefaults.standard.object(forKey: "showMenuBar") as? Bool ?? true
+        }
+        set {
+            withMutation(keyPath: \.showMenuBar) {
+                UserDefaults.standard.set(newValue, forKey: "showMenuBar")
+            }
+        }
+    }
+
+    var showDock: Bool {
+        get {
+            access(keyPath: \.showDock)
+            return UserDefaults.standard.object(forKey: "showDock") as? Bool ?? true
+        }
+        set {
+            withMutation(keyPath: \.showDock) {
+                UserDefaults.standard.set(newValue, forKey: "showDock")
+            }
+        }
+    }
+
+    var showWindowShadows: Bool {
+        get {
+            access(keyPath: \.showWindowShadows)
+            return UserDefaults.standard.object(forKey: "showWindowShadows") as? Bool ?? true
+        }
+        set {
+            withMutation(keyPath: \.showWindowShadows) {
+                UserDefaults.standard.set(newValue, forKey: "showWindowShadows")
+            }
+        }
+    }
+
+    // MARK: - Output Settings
+
+    var outputDirectory: URL {
+        // Use Documents directory within the app's sandbox container
+        // This is always accessible without additional entitlements
+        // Path will be: ~/Library/Containers/[bundle-id]/Data/Documents/BetterCapture/
+        return URL.documentsDirectory.appending(path: "BetterCapture")
+    }
+
+    // MARK: - Private Storage
+
+    private var frameRateRaw: Int {
+        get {
+            access(keyPath: \.frameRateRaw)
+            let value = UserDefaults.standard.integer(forKey: "frameRate")
+            return value == 0 ? 60 : value
+        }
+        set {
+            withMutation(keyPath: \.frameRateRaw) {
+                UserDefaults.standard.set(newValue, forKey: "frameRate")
+            }
+        }
+    }
+
+    private var videoCodecRaw: String {
+        get {
+            access(keyPath: \.videoCodecRaw)
+            return UserDefaults.standard.string(forKey: "videoCodec") ?? VideoCodec.hevc.rawValue
+        }
+        set {
+            withMutation(keyPath: \.videoCodecRaw) {
+                UserDefaults.standard.set(newValue, forKey: "videoCodec")
+            }
+        }
+    }
+
+    private var containerFormatRaw: String {
+        get {
+            access(keyPath: \.containerFormatRaw)
+            return UserDefaults.standard.string(forKey: "containerFormat") ?? ContainerFormat.mov.rawValue
+        }
+        set {
+            withMutation(keyPath: \.containerFormatRaw) {
+                UserDefaults.standard.set(newValue, forKey: "containerFormat")
+            }
+        }
+    }
+
+    private var audioCodecRaw: String {
+        get {
+            access(keyPath: \.audioCodecRaw)
+            return UserDefaults.standard.string(forKey: "audioCodec") ?? AudioCodec.aac.rawValue
+        }
+        set {
+            withMutation(keyPath: \.audioCodecRaw) {
+                UserDefaults.standard.set(newValue, forKey: "audioCodec")
+            }
+        }
+    }
+
+    // MARK: - Helper Methods
+
+    /// Generates a filename based on the current timestamp
+    func generateFilename() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd-HH.mm.ss"
+        let timestamp = formatter.string(from: Date())
+        return "BetterCapture_\(timestamp).\(containerFormat.fileExtension)"
+    }
+
+    /// Returns the full output URL for a new recording
+    func generateOutputURL() -> URL {
+        outputDirectory.appending(path: generateFilename())
+    }
+}
