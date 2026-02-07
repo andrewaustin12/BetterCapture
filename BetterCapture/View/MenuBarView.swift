@@ -29,6 +29,16 @@ struct MenuBarView: View {
 
     private var idleContent: some View {
         VStack(spacing: 0) {
+            // Permission status banner (if required permissions are missing)
+            if viewModel.permissionService.screenRecordingState != .granted ||
+                (viewModel.settings.captureMicrophone && viewModel.permissionService.microphoneState != .granted) {
+                PermissionStatusBanner(
+                    permissionService: viewModel.permissionService,
+                    showMicrophonePermission: viewModel.settings.captureMicrophone
+                )
+                MenuBarDivider()
+            }
+
             // Start Recording Button
             MenuBarActionButton(
                 title: "Start Recording",
@@ -245,6 +255,89 @@ struct ContentSharingPickerButton: View {
                     .foregroundStyle(.primary)
 
                 Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(isHovered ? .gray.opacity(0.1) : .clear)
+                .padding(.horizontal, 4)
+        )
+        .onHover { hovering in
+            isHovered = hovering
+        }
+    }
+}
+
+// MARK: - Permission Status Banner
+
+/// A banner showing missing permissions with buttons to open System Settings
+struct PermissionStatusBanner: View {
+    let permissionService: PermissionService
+    let showMicrophonePermission: Bool
+
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                Text("Permissions Required")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+
+            if permissionService.screenRecordingState != .granted {
+                PermissionRow(
+                    title: "Screen Recording",
+                    isGranted: false
+                ) {
+                    permissionService.openScreenRecordingSettings()
+                }
+            }
+
+            if showMicrophonePermission && permissionService.microphoneState != .granted {
+                PermissionRow(
+                    title: "Microphone",
+                    isGranted: false
+                ) {
+                    permissionService.openMicrophoneSettings()
+                }
+            }
+        }
+        .padding(.bottom, 8)
+    }
+}
+
+/// A single permission row with status and action button
+struct PermissionRow: View {
+    let title: String
+    let isGranted: Bool
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: isGranted ? "checkmark.circle.fill" : "xmark.circle.fill")
+                    .foregroundStyle(isGranted ? .green : .red)
+                    .font(.system(size: 12))
+
+                Text(title)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                if !isGranted {
+                    Text("Open Settings")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 4)
