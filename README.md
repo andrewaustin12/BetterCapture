@@ -39,11 +39,9 @@ Download the latest release from [GitHub Releases](https://github.com/jsattler/B
 
 ## Contributing
 
-**Feature requests**: Please [open a discussion](https://github.com/jsattler/BetterCapture/discussions) first to discuss your idea with the community.
+We welcome contributions of all kinds! Please see our [Contributing Guidelines](CONTRIBUTING.md) for more details on how to get involved.
 
-**Bug reports**: [Open an issue](https://github.com/jsattler/BetterCapture/issues) with detailed reproduction steps and system information.
-
-**Pull requests**: For bug fixes, feel free to submit directly. For new features, please open a discussion first.
+**Note**: Any issues or pull requests for feature requests submitted without prior discussion will be closed immediately.
 
 ## Acknowledgments
 
