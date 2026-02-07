@@ -60,6 +60,7 @@ final class RecorderViewModel {
     let audioDeviceService: AudioDeviceService
     let previewService: PreviewService
     let notificationService: NotificationService
+    let permissionService: PermissionService
     private let captureEngine: CaptureEngine
     private let assetWriter: AssetWriter
 
@@ -78,12 +79,26 @@ final class RecorderViewModel {
         self.audioDeviceService = AudioDeviceService()
         self.previewService = PreviewService()
         self.notificationService = NotificationService()
+        self.permissionService = PermissionService()
         self.captureEngine = CaptureEngine()
         self.assetWriter = AssetWriter()
 
         captureEngine.delegate = self
         captureEngine.sampleBufferDelegate = assetWriter
         previewService.delegate = self
+    }
+
+    // MARK: - Permission Methods
+
+    /// Requests required permissions on app launch
+    /// Only requests microphone permission if microphone capture is enabled
+    func requestPermissionsOnLaunch() async {
+        await permissionService.requestPermissions(includeMicrophone: settings.captureMicrophone)
+    }
+
+    /// Refreshes the current permission states
+    func refreshPermissions() {
+        permissionService.updatePermissionStates()
     }
 
     // MARK: - Public Methods

@@ -16,6 +16,10 @@ struct BetterCaptureApp: App {
         // Using .window style to support custom toggle switches
         MenuBarExtra {
             MenuBarView(viewModel: viewModel)
+                .task {
+                    // Request permissions on first app launch
+                    await viewModel.requestPermissionsOnLaunch()
+                }
         } label: {
             MenuBarLabel(viewModel: viewModel)
         }

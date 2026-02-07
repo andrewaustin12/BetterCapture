@@ -209,9 +209,9 @@ extension NotificationService: UNUserNotificationCenterDelegate {
 
         switch response.actionIdentifier {
         case NotificationIdentifier.actionShowInFinder,
-             UNNotificationDefaultActionIdentifier where categoryIdentifier == NotificationIdentifier.categoryRecordingSaved:
+            UNNotificationDefaultActionIdentifier where await categoryIdentifier == NotificationIdentifier.categoryRecordingSaved:
             // User tapped the notification or the "Show in Finder" action
-            if let folderPath = userInfo[UserInfoKey.folderURL] as? String {
+            if let folderPath = await userInfo[UserInfoKey.folderURL] as? String {
                 await MainActor.run {
                     openFolderInFinder(path: folderPath)
                 }
