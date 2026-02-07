@@ -17,7 +17,7 @@
   }
 </script>
 
-<section class="relative pt-8 md:pt-12 lg:pt-12 pb-8 px-4 md:px-8 lg:px-18 h-screen flex items-center">
+<section class="relative pt-8 md:pt-12 lg:pt-20 pb-8 px-4 md:px-8 lg:px-18 h-screen flex items-center">
   <div class="mx-auto w-full">
     <!-- Main Hero Card -->
     <div class="relative w-full h-[80vh] md:h-[75vh] lg:h-[90vh] px-6 md:px-12 lg:px-40 rounded-3xl overflow-hidden flex items-center">
