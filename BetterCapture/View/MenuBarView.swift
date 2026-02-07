@@ -49,13 +49,26 @@ struct MenuBarView: View {
 
             // Preview thumbnail below the content selection button
             if viewModel.hasContentSelected {
-                PreviewThumbnailView(previewImage: currentPreview)
-                    .onChange(of: viewModel.previewService.previewImage) { _, newImage in
-                        currentPreview = newImage
+                PreviewThumbnailView(
+                    previewImage: currentPreview,
+                    isLivePreviewActive: viewModel.previewService.isCapturing,
+                    onStartLivePreview: {
+                        Task {
+                            await viewModel.startPreview()
+                        }
+                    },
+                    onStopLivePreview: {
+                        Task {
+                            await viewModel.stopPreview()
+                        }
                     }
-                    .onAppear {
-                        currentPreview = viewModel.previewService.previewImage
-                    }
+                )
+                .onChange(of: viewModel.previewService.previewImage) { _, newImage in
+                    currentPreview = newImage
+                }
+                .onAppear {
+                    currentPreview = viewModel.previewService.previewImage
+                }
             }
 
             MenuBarDivider()
