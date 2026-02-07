@@ -7,7 +7,6 @@
 
 import Foundation
 import ScreenCaptureKit
-import UserNotifications
 import AppKit
 import OSLog
 
@@ -60,6 +59,7 @@ final class RecorderViewModel {
     let settings: SettingsStore
     let audioDeviceService: AudioDeviceService
     let previewService: PreviewService
+    let notificationService: NotificationService
     private let captureEngine: CaptureEngine
     private let assetWriter: AssetWriter
 
@@ -77,15 +77,13 @@ final class RecorderViewModel {
         self.settings = SettingsStore()
         self.audioDeviceService = AudioDeviceService()
         self.previewService = PreviewService()
+        self.notificationService = NotificationService()
         self.captureEngine = CaptureEngine()
         self.assetWriter = AssetWriter()
 
         captureEngine.delegate = self
         captureEngine.sampleBufferDelegate = assetWriter
         previewService.delegate = self
-
-        // Request notification permissions
-        requestNotificationPermission()
     }
 
     // MARK: - Public Methods
@@ -108,11 +106,10 @@ final class RecorderViewModel {
 
             logger.info("Starting recording sequence...")
 
-            // Cancel any in-progress preview capture before starting recording
-            logger.info("Cancelling any active preview...")
-            await previewService.cancelCapture()
-            previewService.clearPreview()
-            logger.info("Preview cleared")
+            // Stop any active live preview before starting recording
+            logger.info("Stopping any active live preview...")
+            await previewService.stopPreview()
+            logger.info("Live preview stopped")
 
             // Determine video size from filter
             if let filter = captureEngine.contentFilter {
@@ -159,20 +156,19 @@ final class RecorderViewModel {
             state = .idle
             recordingDuration = 0
 
-            // Send notification
-            sendRecordingCompleteNotification(fileURL: outputURL)
-
             logger.info("Recording stopped and saved to: \(outputURL.lastPathComponent)")
 
-            // Re-capture preview for the selected content
-            if let filter = selectedContentFilter {
-                await previewService.captureSnapshot(for: filter)
-            }
+            // Brief delay to ensure screen sharing mode has fully stopped before sending notification
+            try? await Task.sleep(for: .milliseconds(100))
+
+            // Send notification
+            notificationService.sendRecordingSavedNotification(fileURL: outputURL)
 
         } catch {
             state = .idle
             lastError = error
             assetWriter.cancel()
+            notificationService.sendRecordingFailedNotification(error: error)
             logger.error("Failed to stop recording: \(error.localizedDescription)")
         }
     }
@@ -180,6 +176,17 @@ final class RecorderViewModel {
     /// Clears the current content selection
     func clearSelection() {
         captureEngine.clearSelection()
+    }
+
+    /// Starts the live preview stream (call when menu bar window opens)
+    func startPreview() async {
+        guard !isRecording else { return }
+        await previewService.startPreview()
+    }
+
+    /// Stops the live preview stream (call when menu bar window closes)
+    func stopPreview() async {
+        await previewService.stopPreview()
     }
 
     // MARK: - Timer Management
@@ -200,38 +207,6 @@ final class RecorderViewModel {
         recordingTimer?.invalidate()
         recordingTimer = nil
         recordingStartTime = nil
-    }
-
-    // MARK: - Notifications
-
-    private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
-            if let error {
-                self.logger.error("Notification permission error: \(error.localizedDescription)")
-            }
-        }
-    }
-
-    private func sendRecordingCompleteNotification(fileURL: URL) {
-        let content = UNMutableNotificationContent()
-        content.title = "Recording Saved"
-        content.body = "Your recording has been saved to \(fileURL.lastPathComponent)"
-        content.sound = .default
-
-        // Store the file URL for opening when notification is clicked
-        content.userInfo = ["fileURL": fileURL.path()]
-
-        let request = UNNotificationRequest(
-            identifier: UUID().uuidString,
-            content: content,
-            trigger: nil
-        )
-
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error {
-                self.logger.error("Failed to send notification: \(error.localizedDescription)")
-            }
-        }
     }
 
     // MARK: - Helper Methods
@@ -268,13 +243,9 @@ extension RecorderViewModel: CaptureEngineDelegate {
         selectedContentFilter = filter
         logger.info("Content filter updated")
 
-        // Capture a preview snapshot for the new filter if not recording
-        if !isRecording {
-            Task {
-                // Cancel any in-progress capture first to ensure the new one starts
-                await previewService.cancelCapture()
-                await previewService.captureSnapshot(for: filter)
-            }
+        // Capture a static thumbnail for the preview
+        Task {
+            await previewService.setContentFilter(filter)
         }
     }
 
@@ -289,6 +260,7 @@ extension RecorderViewModel: CaptureEngineDelegate {
             stopTimer()
             assetWriter.cancel()
             state = .idle
+            notificationService.sendRecordingStoppedNotification(error: error)
         }
     }
 
