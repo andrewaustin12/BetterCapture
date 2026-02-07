@@ -96,6 +96,7 @@ struct MenuBarView: View {
             }
 
             MenuBarActionButton(title: "Settings...", systemImage: "gear") {
+                NSApplication.shared.activate(ignoringOtherApps: true)
                 openSettings()
             }
 
