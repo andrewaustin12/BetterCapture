@@ -1,5 +1,5 @@
 cask "bettercapture" do
-  version "1.0.0"
+  version "2026.1.0"
   sha256 :no_check
 
   url "https://github.com/jsattler/BetterCapture/releases/download/v#{version}/BetterCapture-#{version}-arm64.dmg",
