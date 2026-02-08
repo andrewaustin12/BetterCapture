@@ -6,7 +6,7 @@
   
   async function copyToClipboard() {
     try {
-      await navigator.clipboard.writeText('brew install --cask bettercapture');
+      await navigator.clipboard.writeText('brew install jsattler/tap/bettercapture');
       copied = true;
       setTimeout(() => {
         copied = false;
@@ -32,7 +32,7 @@
         <div class="flex flex-col items-center gap-4 max-w-lg mx-auto">
           <!-- Homebrew command -->
           <div class="w-full bg-black/40 backdrop-blur-sm rounded-xl px-4 py-3 font-mono text-sm text-white/90 flex items-center justify-between gap-3 border border-white/10">
-            <code class="truncate">brew install --cask bettercapture</code>
+            <code class="truncate">brew install jsattler/tap/bettercapture</code>
             <button 
               onclick={copyToClipboard}
               class="flex-shrink-0 p-2 hover:bg-white/10 rounded-lg transition-colors"
