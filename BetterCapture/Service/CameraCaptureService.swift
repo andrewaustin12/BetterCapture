@@ -41,7 +41,7 @@ final class CameraCaptureService: NSObject {
 
     // Bubble dimensions for overlay (matches PreviewSize.medium)
     private let captureWidth = 240
-    private let captureHeight = 180
+    private let captureHeight = 240
 
     // MARK: - Public Methods
 
@@ -165,9 +165,18 @@ final class CameraCaptureService: NSObject {
 
         guard let outputBuffer = scaledBuffer else { return nil }
 
-        let ciImage = CIImage(cvPixelBuffer: sourceBuffer)
-        let scaleX = CGFloat(targetWidth) / CGFloat(CVPixelBufferGetWidth(sourceBuffer))
-        let scaleY = CGFloat(targetHeight) / CGFloat(CVPixelBufferGetHeight(sourceBuffer))
+        // Start from source buffer and create a Core Image representation.
+        var ciImage = CIImage(cvPixelBuffer: sourceBuffer)
+
+        // Un-mirror the camera feed so the bubble and final recording use
+        // the same left/right orientation (more like Loom and most recorders).
+        let originalExtent = ciImage.extent
+        let mirrorTransform = CGAffineTransform(scaleX: -1, y: 1)
+            .translatedBy(x: -originalExtent.width, y: 0)
+        ciImage = ciImage.transformed(by: mirrorTransform)
+
+        let scaleX = CGFloat(targetWidth) / originalExtent.width
+        let scaleY = CGFloat(targetHeight) / originalExtent.height
         var scaledImage = ciImage.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
 
         if backgroundEffect == .blur, let blurredImage = applyBackgroundBlur(to: scaledImage) {
@@ -244,6 +253,13 @@ extension CameraCaptureService: AVCaptureVideoDataOutputSampleBufferDelegate {
         )
 
         var ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+
+        // Un-mirror the preview image to match the recorded orientation.
+        let extent = ciImage.extent
+        let mirrorTransform = CGAffineTransform(scaleX: -1, y: 1)
+            .translatedBy(x: -extent.width, y: 0)
+        ciImage = ciImage.transformed(by: mirrorTransform)
+
         if self.backgroundEffect == .blur, let blurred = self.applyBackgroundBlur(to: ciImage) {
             ciImage = blurred
         }

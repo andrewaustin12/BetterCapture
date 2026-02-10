@@ -164,9 +164,20 @@ final class RecorderViewModel {
             videoCompositor.isCameraOverlayEnabled = settings.showCameraBubble
             videoCompositor.overlayCorner = settings.previewBubbleCorner
             videoCompositor.overlaySize = settings.previewBubbleSize.dimensions
+            let targetScreenForBubble: NSScreen?
             if let filter = captureEngine.contentFilter {
                 videoCompositor.contentRect = filter.contentRect
                 videoCompositor.pointPixelScale = CGFloat(filter.pointPixelScale)
+                // Anchor the on-screen bubble to the same physical display as the
+                // captured content so its corner position visually matches recording.
+                let contentCenter = CGPoint(
+                    x: filter.contentRect.midX,
+                    y: filter.contentRect.midY
+                )
+                targetScreenForBubble = NSScreen.screens.first { $0.frame.contains(contentCenter) }
+            }
+            else {
+                targetScreenForBubble = NSScreen.main
             }
             videoCompositor.bubbleFrameInScreen = nil
 
@@ -185,7 +196,8 @@ final class RecorderViewModel {
                     at: settings.previewBubbleCorner,
                     size: settings.previewBubbleSize,
                     isCameraBubble: true,
-                    initialImage: nil
+                    initialImage: nil,
+                    screen: targetScreenForBubble
                 )
                 try? await Task.sleep(for: .milliseconds(50))
                 videoCompositor.bubbleFrameInScreen = previewBubbleWindow.frameInScreenCoordinates
@@ -202,7 +214,13 @@ final class RecorderViewModel {
                 logger.info("Starting screen preview bubble...")
                 if let filter = captureEngine.contentFilter {
                     previewBubbleService.setContentFilter(filter)
-                    previewBubbleWindow.show(at: settings.previewBubbleCorner, size: settings.previewBubbleSize)
+                    previewBubbleWindow.show(
+                        at: settings.previewBubbleCorner,
+                        size: settings.previewBubbleSize,
+                        isCameraBubble: false,
+                        initialImage: nil,
+                        screen: targetScreenForBubble
+                    )
                     try? await Task.sleep(for: .milliseconds(50))
                     if let windowNumber = previewBubbleWindow.windowNumber {
                         excludedWindowNumbers.append(windowNumber)
@@ -348,25 +366,48 @@ final class RecorderViewModel {
     func showIdleCameraBubbleIfNeeded() async {
         guard settings.showCameraBubble else { return }
         guard !isRecording else { return }
-        guard !previewBubbleWindow.isVisible else { return }
 
-        var hasCameraPermission = cameraCaptureService.hasPermission
-        if !hasCameraPermission {
-            hasCameraPermission = await cameraCaptureService.requestPermission()
+        // If the user has already selected capture content, anchor the bubble
+        // to the same physical screen as that content; otherwise fall back to
+        // the main screen.
+        let targetScreenForBubble: NSScreen?
+        if let filter = captureEngine.contentFilter {
+            let contentCenter = CGPoint(
+                x: filter.contentRect.midX,
+                y: filter.contentRect.midY
+            )
+            targetScreenForBubble = NSScreen.screens.first { $0.frame.contains(contentCenter) }
+        } else {
+            targetScreenForBubble = NSScreen.main
         }
 
-        cameraCaptureService.backgroundEffect = settings.cameraBackgroundEffect
-        await cameraCaptureService.startCapture(selectedDeviceID: settings.selectedCameraID)
+        if !previewBubbleWindow.isVisible {
+            var hasCameraPermission = cameraCaptureService.hasPermission
+            if !hasCameraPermission {
+                hasCameraPermission = await cameraCaptureService.requestPermission()
+            }
 
-        previewBubbleWindow.show(
-            at: settings.previewBubbleCorner,
-            size: settings.previewBubbleSize,
-            isCameraBubble: true,
-            initialImage: cameraCaptureService.previewImage
-        )
+            cameraCaptureService.backgroundEffect = settings.cameraBackgroundEffect
+            await cameraCaptureService.startCapture(selectedDeviceID: settings.selectedCameraID)
 
-        if !hasCameraPermission {
-            logger.warning("Camera permission not granted, idle camera bubble will show placeholder")
+            previewBubbleWindow.show(
+                at: settings.previewBubbleCorner,
+                size: settings.previewBubbleSize,
+                isCameraBubble: true,
+                initialImage: cameraCaptureService.previewImage,
+                screen: targetScreenForBubble
+            )
+
+            if !hasCameraPermission {
+                logger.warning("Camera permission not granted, idle camera bubble will show placeholder")
+            }
+        } else {
+            // Bubble already visible – just move/resize it to the correct screen/corner.
+            previewBubbleWindow.resize(
+                to: settings.previewBubbleSize,
+                corner: settings.previewBubbleCorner,
+                screen: targetScreenForBubble
+            )
         }
 
         startIdleCameraBubbleUpdates()
@@ -417,6 +458,13 @@ extension RecorderViewModel: CaptureEngineDelegate {
         // Capture a static thumbnail for the preview
         Task {
             await previewService.setContentFilter(filter)
+
+            // When the user selects new content and the camera bubble is enabled,
+            // ensure the idle bubble (if visible) is anchored to the same screen
+            // as the selected content before recording starts.
+            if settings.showCameraBubble, !isRecording {
+                await showIdleCameraBubbleIfNeeded()
+            }
         }
     }
 

@@ -49,12 +49,12 @@ struct PreviewBubbleView: View {
                 screenPreviewContent
             }
         }
-        .frame(width: bubbleSize.width, height: bubbleSize.height)
-        .background {
-            RoundedRectangle(cornerRadius: isCameraBubble ? bubbleSize.width / 2 : 10)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 2)
-        }
+//        .frame(width: bubbleSize.width, height: bubbleSize.height)
+//        .background {
+//            RoundedRectangle(cornerRadius: isCameraBubble ? bubbleSize.width / 2 : 10)
+//                .fill(.ultraThinMaterial)
+//                .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 2)
+//        }
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovered = hovering
@@ -68,6 +68,10 @@ struct PreviewBubbleView: View {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                    .frame(width: bubbleSize.width, height: bubbleSize.width)
+                    .clipped()
+                    .clipShape(.circle)
+                    .contentShape(.circle)
             } else {
                 Rectangle()
                     .fill(.quaternary)
@@ -75,10 +79,10 @@ struct PreviewBubbleView: View {
                         ProgressView()
                             .controlSize(.small)
                     }
+                    .clipShape(.circle)
             }
         }
-        .frame(width: bubbleSize.width - 16, height: bubbleSize.width - 16)
-        .clipShape(.circle)
+        .frame(width: bubbleSize.width, height: bubbleSize.width)
     }
 
     private var screenPreviewContent: some View {

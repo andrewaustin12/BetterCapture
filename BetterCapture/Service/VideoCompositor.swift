@@ -93,33 +93,26 @@ final class VideoCompositor: CaptureEngineSampleBufferDelegate, @unchecked Senda
         let overlayW = overlaySize.width
         let overlayH = overlaySize.height
 
+        // Decide overlay position based solely on the user's selected corner.
+        // This ensures the recorded bubble always matches the setting, regardless
+        // of where the draggable on-screen preview bubble is moved.
+        let padding: CGFloat = 48
         let overlayX: CGFloat
         let overlayY: CGFloat
 
-        // Use bubble's actual screen position when available (matches user's corner setting)
-        if let bubbleFrame = bubbleFrameInScreen, contentRect.width > 0, contentRect.height > 0 {
-            // Map bubble position (screen coords) to capture buffer (pixels)
-            var x = (bubbleFrame.minX - contentRect.minX) * pointPixelScale
-            var y = (bubbleFrame.minY - contentRect.minY) * pointPixelScale
-            overlayX = min(max(x, 0), screenWidth - overlayW)
-            overlayY = min(max(y, 0), screenHeight - overlayH)
-        } else {
-            // Fallback: corner-based positioning
-            let padding: CGFloat = 48
-            switch overlayCorner {
-            case .topLeft:
-                overlayX = padding
-                overlayY = screenHeight - overlayH - padding
-            case .topRight:
-                overlayX = screenWidth - overlayW - padding
-                overlayY = screenHeight - overlayH - padding
-            case .bottomLeft:
-                overlayX = padding
-                overlayY = padding
-            case .bottomRight:
-                overlayX = screenWidth - overlayW - padding
-                overlayY = padding
-            }
+        switch overlayCorner {
+        case .topLeft:
+            overlayX = padding
+            overlayY = screenHeight - overlayH - padding
+        case .topRight:
+            overlayX = screenWidth - overlayW - padding
+            overlayY = screenHeight - overlayH - padding
+        case .bottomLeft:
+            overlayX = padding
+            overlayY = padding
+        case .bottomRight:
+            overlayX = screenWidth - overlayW - padding
+            overlayY = padding
         }
 
         // CIImage uses bottom-left origin; screen capture uses top-left

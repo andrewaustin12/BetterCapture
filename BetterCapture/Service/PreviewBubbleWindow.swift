@@ -77,19 +77,27 @@ final class PreviewBubbleWindow {
 
     private var isCameraBubble = false
 
-    /// Shows the preview bubble window at the specified corner
+    /// Shows the preview bubble window at the specified corner.
     /// - Parameters:
-    ///   - corner: The screen corner to position the window
-    ///   - size: The size of the preview bubble
-    ///   - isCameraBubble: When true, shows a circular static image (no LIVE badge)
-    ///   - initialImage: Optional image to display immediately (e.g. first camera frame)
-    func show(at corner: ScreenCorner, size: PreviewSize = .medium, isCameraBubble: Bool = false, initialImage: NSImage? = nil) {
+    ///   - corner: The screen corner to position the window.
+    ///   - size: The size of the preview bubble.
+    ///   - isCameraBubble: When true, shows a circular static image (no LIVE badge).
+    ///   - initialImage: Optional image to display immediately (e.g. first camera frame).
+    ///   - screen: Optional specific screen to anchor to. If nil, uses the main screen.
+    func show(
+        at corner: ScreenCorner,
+        size: PreviewSize = .medium,
+        isCameraBubble: Bool = false,
+        initialImage: NSImage? = nil,
+        screen: NSScreen? = nil
+    ) {
         currentSize = size
         self.isCameraBubble = isCameraBubble
         if let initialImage { previewImage = initialImage }
 
         guard window == nil else {
-            logger.info("Window already exists, bringing to front")
+            logger.info("Window already exists, updating frame for new size and bringing to front")
+            resize(to: size, corner: corner, screen: screen)
             window?.makeKeyAndOrderFront(nil)
             return
         }
@@ -98,7 +106,12 @@ final class PreviewBubbleWindow {
             ? CGSize(width: min(size.dimensions.width, size.dimensions.height),
                      height: min(size.dimensions.width, size.dimensions.height))
             : size.dimensions
-        let frame = calculateWindowFrame(size: dimensions, corner: corner, isCameraBubble: isCameraBubble)
+        let frame = calculateWindowFrame(
+            size: dimensions,
+            corner: corner,
+            screen: screen,
+            isCameraBubble: isCameraBubble
+        )
 
         // Create panel (floating window)
         let panel = NSPanel(
@@ -114,7 +127,9 @@ final class PreviewBubbleWindow {
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = true
-        panel.isMovableByWindowBackground = true
+        // Keep the bubble pinned to the configured corner so its
+        // on-screen position matches the recorded position.
+        panel.isMovableByWindowBackground = false
         panel.hidesOnDeactivate = false
 
         // Create SwiftUI view
@@ -141,6 +156,34 @@ final class PreviewBubbleWindow {
         panel.orderFrontRegardless()
         panel.makeKeyAndOrderFront(nil)
         logger.info("Preview bubble window shown at \(corner.rawValue)")
+    }
+
+    /// Resizes an existing bubble window to match a new `PreviewSize`.
+    /// If the window is not currently visible, this just updates the stored size.
+    func resize(to size: PreviewSize, corner: ScreenCorner, screen: NSScreen? = nil) {
+        currentSize = size
+
+        guard let window else { return }
+
+        let dimensions: CGSize
+        if isCameraBubble {
+            let side = min(size.dimensions.width, size.dimensions.height)
+            let padding: CGFloat = 16
+            dimensions = CGSize(width: side + padding, height: side + padding)
+        } else {
+            dimensions = size.dimensions
+        }
+
+        let frame = calculateWindowFrame(
+            size: dimensions,
+            corner: corner,
+            screen: screen,
+            isCameraBubble: isCameraBubble
+        )
+        window.setFrame(frame, display: true, animate: true)
+        hostingView?.frame = NSRect(origin: .zero, size: frame.size)
+        updateView()
+        logger.info("Preview bubble window resized to \(dimensions.width)x\(dimensions.height)")
     }
 
     /// Hides the preview bubble window
@@ -181,8 +224,14 @@ final class PreviewBubbleWindow {
 
     // MARK: - Private Methods
 
-    private func calculateWindowFrame(size: CGSize, corner: ScreenCorner, isCameraBubble: Bool = false) -> NSRect {
-        guard let screen = NSScreen.main else {
+    private func calculateWindowFrame(
+        size: CGSize,
+        corner: ScreenCorner,
+        screen: NSScreen? = nil,
+        isCameraBubble: Bool = false
+    ) -> NSRect {
+        let targetScreen = screen ?? NSScreen.main
+        guard let screen = targetScreen else {
             return NSRect(x: 100, y: 100, width: size.width, height: size.height)
         }
 

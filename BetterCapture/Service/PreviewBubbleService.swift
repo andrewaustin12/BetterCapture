@@ -29,7 +29,7 @@ final class PreviewBubbleService: NSObject {
 
     // Preview configuration constants - optimized for bubble preview
     private let previewWidth = 240
-    private let previewHeight = 180
+    private let previewHeight = 240
 
     // MARK: - Public Methods
 

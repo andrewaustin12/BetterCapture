@@ -43,7 +43,7 @@ final class CameraDeviceService {
         let discoverySession = AVCaptureDevice.DiscoverySession(
             deviceTypes: [
                 .builtInWideAngleCamera,
-                .externalUnknown
+                .external
             ],
             mediaType: .video,
             position: .unspecified

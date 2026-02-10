@@ -437,6 +437,9 @@ final class SettingsStore {
             withMutation(keyPath: \.previewBubbleSize) {
                 UserDefaults.standard.set(newValue.rawValue, forKey: "previewBubbleSize")
             }
+            // Notify interested parts of the app (e.g. the preview bubble window)
+            // that the size has changed so they can update live.
+            NotificationCenter.default.post(name: .previewBubbleSizeDidChange, object: nil)
         }
     }
 
@@ -627,4 +630,12 @@ final class SettingsStore {
     func generateOutputURL() -> URL {
         outputDirectory.appending(path: generateFilename())
     }
+}
+
+// MARK: - Notifications
+
+extension Notification.Name {
+    /// Posted when `SettingsStore.previewBubbleSize` changes so that any
+    /// visible preview bubble windows can resize immediately.
+    static let previewBubbleSizeDidChange = Notification.Name("PreviewBubbleSizeDidChange")
 }
