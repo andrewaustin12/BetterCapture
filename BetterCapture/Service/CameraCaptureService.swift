@@ -64,16 +64,28 @@ final class CameraCaptureService: NSObject {
         AVCaptureDevice.authorizationStatus(for: .video) == .authorized
     }
 
-    /// Starts capturing from the default camera
-    func startCapture() async {
+    /// Starts capturing from the selected camera (or system default when nil)
+    /// - Parameter selectedDeviceID: Optional unique ID of the camera device to use
+    func startCapture(selectedDeviceID: String? = nil) async {
         guard !isCapturing else { return }
         guard hasPermission else {
             logger.warning("Camera permission not granted")
             return
         }
 
-        // On macOS, use default(for:) — builtInWideAngleCamera with position fails on Mac
-        guard let camera = AVCaptureDevice.default(for: .video) else {
+        // Prefer the explicitly selected device when available, otherwise fall back gracefully
+        let videoDevices = AVCaptureDevice.devices(for: .video)
+
+        let camera: AVCaptureDevice?
+        if let selectedDeviceID,
+           let selected = videoDevices.first(where: { $0.uniqueID == selectedDeviceID }) {
+            camera = selected
+        } else {
+            // On macOS, use default(for:) — builtInWideAngleCamera with position fails on Mac
+            camera = AVCaptureDevice.default(for: .video) ?? videoDevices.first
+        }
+
+        guard let camera else {
             logger.error("No camera device available")
             return
         }

@@ -15,13 +15,16 @@ struct MenuBarView: View {
     @State private var currentPreview: NSImage?
 
     var body: some View {
-        VStack(spacing: 0) {
-            if viewModel.isRecording {
-                recordingContent
-            } else {
-                idleContent
+        ScrollView {
+            VStack(spacing: 0) {
+                if viewModel.isRecording {
+                    recordingContent
+                } else {
+                    idleContent
+                }
             }
         }
+        .scrollIndicators(.hidden)
         .frame(width: 320)
     }
 
@@ -90,12 +93,11 @@ struct MenuBarView: View {
 
             MenuBarDivider()
 
-            // Settings Sections (no divider between them - section headers provide separation)
-            VideoSettingsSection(settings: viewModel.settings)
-
-            AudioSettingsSection(
+            // Compact source controls (microphone only; full video/audio settings live in the Settings window)
+            SourceSettingsSection(
                 settings: viewModel.settings,
-                audioDeviceService: viewModel.audioDeviceService
+                audioDeviceService: viewModel.audioDeviceService,
+                cameraDeviceService: viewModel.cameraDeviceService
             )
 
             MenuBarDivider()
@@ -137,6 +139,31 @@ struct MenuBarView: View {
                 }
             }
             .padding(.vertical, 8)
+        }
+    }
+}
+
+// MARK: - Source Settings Section
+
+/// Compact source controls for the menu bar, showing only the current microphone with a dropdown
+struct SourceSettingsSection: View {
+    @Bindable var settings: SettingsStore
+    let audioDeviceService: AudioDeviceService
+    let cameraDeviceService: CameraDeviceService
+
+    var body: some View {
+        VStack(spacing: 0) {
+            SectionHeader(title: "Sources")
+
+            CameraExpandablePicker(
+                selectedID: $settings.selectedCameraID,
+                devices: cameraDeviceService.availableDevices
+            )
+
+            MicrophoneExpandablePicker(
+                selectedID: $settings.selectedMicrophoneID,
+                devices: audioDeviceService.availableDevices
+            )
         }
     }
 }

@@ -417,6 +417,96 @@ struct MenuBarExpandableSection<Content: View>: View {
     }
 }
 
+// MARK: - Camera Expandable Picker
+
+/// A camera picker with device-style rows (icon in circle)
+struct CameraExpandablePicker: View {
+    @Binding var selectedID: String?
+    let devices: [CameraInputDevice]
+    @State private var isExpanded = false
+    @State private var isHovered = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header row
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack {
+                    Text("Camera")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Text(currentLabel)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .background(
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(isHovered ? .gray.opacity(0.1) : .clear)
+                    .padding(.horizontal, 4)
+            )
+            .onHover { hovering in
+                isHovered = hovering
+            }
+
+            // Expanded device options
+            if isExpanded {
+                VStack(spacing: 0) {
+                    // System Default option
+                    DeviceRow(
+                        name: "System Default",
+                        icon: "video",
+                        isSelected: selectedID == nil
+                    ) {
+                        selectedID = nil
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isExpanded = false
+                        }
+                    }
+
+                    // Available devices
+                    ForEach(devices) { device in
+                        DeviceRow(
+                            name: device.name,
+                            icon: device.isDefault ? "video.fill" : "video",
+                            isSelected: selectedID == device.id
+                        ) {
+                            selectedID = device.id
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isExpanded = false
+                            }
+                        }
+                    }
+                }
+                .padding(.leading, 12)
+                .background(.quaternary.opacity(0.3))
+            }
+        }
+    }
+
+    private var currentLabel: String {
+        if let id = selectedID, let device = devices.first(where: { $0.id == id }) {
+            return device.name
+        }
+        if devices.isEmpty {
+            return "No Camera"
+        }
+        return "System Default"
+    }
+}
+
 // MARK: - Video Settings Section
 
 /// Video settings section with header and inline content

@@ -22,7 +22,7 @@ struct BetterCaptureApp: App {
                     // Request permissions on first app launch
                     print("🚀 BetterCapture: App launching, requesting permissions...")
                     await viewModel.requestPermissionsOnLaunch()
-                    
+
                     // Also check permissions after a short delay to catch any that were just granted
                     try? await Task.sleep(for: .milliseconds(500))
                     print("🚀 BetterCapture: Re-checking permissions after launch delay...")
@@ -33,6 +33,11 @@ struct BetterCaptureApp: App {
                     // This ensures permissions are up-to-date after returning from System Settings
                     print("🚀 BetterCapture: Menu bar window appeared, refreshing permissions...")
                     viewModel.refreshPermissions()
+
+                    // Ensure camera bubble is visible when menu opens (Loom-style behavior)
+                    Task {
+                        await viewModel.showIdleCameraBubbleIfNeeded()
+                    }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                     // Refresh permissions when app becomes active (e.g., after returning from System Settings)
@@ -71,8 +76,8 @@ struct MenuBarLabel: View {
             Text(viewModel.formattedDuration)
                 .monospacedDigit()
         } else {
-            // Show app icon
-            Image(systemName: "record.circle")
+            // Show a distinct app icon so it doesn't look like the system screen recording indicator
+            Image(systemName: "rectangle.inset.filled.and.person.filled")
         }
     }
 }

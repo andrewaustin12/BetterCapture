@@ -294,6 +294,18 @@ final class SettingsStore {
         }
     }
 
+    var selectedCameraID: String? {
+        get {
+            access(keyPath: \.selectedCameraID)
+            return UserDefaults.standard.string(forKey: "selectedCameraID")
+        }
+        set {
+            withMutation(keyPath: \.selectedCameraID) {
+                UserDefaults.standard.set(newValue, forKey: "selectedCameraID")
+            }
+        }
+    }
+
     // MARK: - Content Filter Settings
 
     var showCursor: Bool {

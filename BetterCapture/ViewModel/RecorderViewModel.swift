@@ -58,6 +58,7 @@ final class RecorderViewModel {
 
     let settings: SettingsStore
     let audioDeviceService: AudioDeviceService
+    let cameraDeviceService: CameraDeviceService
     let previewService: PreviewService
     let notificationService: NotificationService
     let permissionService: PermissionService
@@ -75,12 +76,14 @@ final class RecorderViewModel {
     private var recordingTimer: Timer?
     private var recordingStartTime: Date?
     private var videoSize: CGSize = .zero
+    private var idleCameraBubbleTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
     init() {
         self.settings = SettingsStore()
         self.audioDeviceService = AudioDeviceService()
+        self.cameraDeviceService = CameraDeviceService()
         self.previewService = PreviewService()
         self.notificationService = NotificationService()
         self.permissionService = PermissionService()
@@ -129,6 +132,10 @@ final class RecorderViewModel {
             return
         }
 
+        // Stop any idle camera bubble update loop when we transition into recording
+        idleCameraBubbleTask?.cancel()
+        idleCameraBubbleTask = nil
+
         do {
             state = .recording
             lastError = nil
@@ -173,7 +180,7 @@ final class RecorderViewModel {
                 }
                 // Always show bubble when camera bubble is enabled (even if camera fails)
                 cameraCaptureService.backgroundEffect = settings.cameraBackgroundEffect
-                await cameraCaptureService.startCapture()
+                await cameraCaptureService.startCapture(selectedDeviceID: settings.selectedCameraID)
                 previewBubbleWindow.show(
                     at: settings.previewBubbleCorner,
                     size: settings.previewBubbleSize,
@@ -332,6 +339,65 @@ final class RecorderViewModel {
         }
 
         return CGSize(width: 1920, height: 1080)
+    }
+
+    // MARK: - Camera Bubble (Idle State)
+
+    /// Shows the Loom-style camera bubble when enabled, even before recording starts.
+    /// Called when the menu bar UI appears.
+    func showIdleCameraBubbleIfNeeded() async {
+        guard settings.showCameraBubble else { return }
+        guard !isRecording else { return }
+        guard !previewBubbleWindow.isVisible else { return }
+
+        var hasCameraPermission = cameraCaptureService.hasPermission
+        if !hasCameraPermission {
+            hasCameraPermission = await cameraCaptureService.requestPermission()
+        }
+
+        cameraCaptureService.backgroundEffect = settings.cameraBackgroundEffect
+        await cameraCaptureService.startCapture(selectedDeviceID: settings.selectedCameraID)
+
+        previewBubbleWindow.show(
+            at: settings.previewBubbleCorner,
+            size: settings.previewBubbleSize,
+            isCameraBubble: true,
+            initialImage: cameraCaptureService.previewImage
+        )
+
+        if !hasCameraPermission {
+            logger.warning("Camera permission not granted, idle camera bubble will show placeholder")
+        }
+
+        startIdleCameraBubbleUpdates()
+    }
+
+    /// Hides the idle camera bubble when not recording.
+    func hideIdleCameraBubbleIfNeeded() {
+        guard !isRecording else { return }
+        idleCameraBubbleTask?.cancel()
+        idleCameraBubbleTask = nil
+        cameraCaptureService.stopCapture()
+        previewBubbleWindow.hide()
+    }
+
+    /// Starts a lightweight update loop that keeps the idle camera bubble in sync with the latest camera frame.
+    private func startIdleCameraBubbleUpdates() {
+        idleCameraBubbleTask?.cancel()
+        idleCameraBubbleTask = Task { [weak self] in
+            await MainActor.run { }
+            while let self, !self.isRecording, self.settings.showCameraBubble, self.previewBubbleWindow.isVisible {
+                if let image = self.cameraCaptureService.previewImage {
+                    self.previewBubbleWindow.updatePreview(image)
+                }
+
+                do {
+                    try await Task.sleep(for: .milliseconds(100))
+                } catch {
+                    break
+                }
+            }
+        }
     }
 
     /// Gets the preview bubble window for exclusion purposes
