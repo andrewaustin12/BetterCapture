@@ -133,6 +133,30 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
     // Track frame counts for debugging
     private var frameCount = 0
 
+    /// Appends a composited pixel buffer (e.g. screen + camera overlay) - bypasses frame status check
+    func appendCompositedVideoFrame(_ pixelBuffer: CVPixelBuffer, presentationTime: CMTime) {
+        lock.withLockUnchecked {
+            guard let assetWriter,
+                  assetWriter.status == .writing,
+                  let videoInput,
+                  videoInput.isReadyForMoreMediaData,
+                  let adaptor = pixelBufferAdaptor else {
+                return
+            }
+
+            if !hasStartedSession {
+                assetWriter.startSession(atSourceTime: presentationTime)
+                sessionStartTime = presentationTime
+                hasStartedSession = true
+                logger.info("Session started at time: \(presentationTime.seconds)")
+            }
+
+            if adaptor.append(pixelBuffer, withPresentationTime: presentationTime) {
+                frameCount += 1
+            }
+        }
+    }
+
     /// Appends a video sample buffer - called synchronously from capture queue
     func appendVideoSample(_ sampleBuffer: CMSampleBuffer) {
         // Check frame status first - only process complete frames
@@ -224,6 +248,16 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
                   let microphoneInput,
                   microphoneInput.isReadyForMoreMediaData else {
                 return
+            }
+
+            let presentationTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+
+            // Start session on first sample if video/audio hasn't started it yet
+            if !hasStartedSession {
+                assetWriter.startSession(atSourceTime: presentationTime)
+                sessionStartTime = presentationTime
+                hasStartedSession = true
+                logger.info("Session started at time: \(presentationTime.seconds)")
             }
 
             if !microphoneInput.append(sampleBuffer) {

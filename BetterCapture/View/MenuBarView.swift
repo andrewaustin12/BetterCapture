@@ -31,10 +31,15 @@ struct MenuBarView: View {
         VStack(spacing: 0) {
             // Permission status banner (if required permissions are missing)
             if viewModel.permissionService.screenRecordingState != .granted ||
-                (viewModel.settings.captureMicrophone && viewModel.permissionService.microphoneState != .granted) {
+                (viewModel.settings.captureMicrophone && viewModel.permissionService.microphoneState != .granted) ||
+                (viewModel.settings.showCameraBubble && viewModel.permissionService.cameraState != .granted) {
                 PermissionStatusBanner(
                     permissionService: viewModel.permissionService,
-                    showMicrophonePermission: viewModel.settings.captureMicrophone
+                    showMicrophonePermission: viewModel.settings.captureMicrophone,
+                    showCameraPermission: viewModel.settings.showCameraBubble,
+                    onRefresh: {
+                        viewModel.refreshPermissions()
+                    }
                 )
                 MenuBarDivider()
             }
@@ -78,6 +83,8 @@ struct MenuBarView: View {
                 }
                 .onAppear {
                     currentPreview = viewModel.previewService.previewImage
+                    // Refresh permissions when preview appears
+                    viewModel.refreshPermissions()
                 }
             }
 
@@ -278,6 +285,8 @@ struct ContentSharingPickerButton: View {
 struct PermissionStatusBanner: View {
     let permissionService: PermissionService
     let showMicrophonePermission: Bool
+    var showCameraPermission: Bool = false
+    let onRefresh: () -> Void
 
     var body: some View {
         VStack(spacing: 4) {
@@ -297,6 +306,11 @@ struct PermissionStatusBanner: View {
                     isGranted: false
                 ) {
                     permissionService.openScreenRecordingSettings()
+                    // Refresh permissions after a delay to check if user granted permission
+                    Task {
+                        try? await Task.sleep(for: .seconds(1))
+                        onRefresh()
+                    }
                 }
             }
 
@@ -306,6 +320,23 @@ struct PermissionStatusBanner: View {
                     isGranted: false
                 ) {
                     permissionService.openMicrophoneSettings()
+                    Task {
+                        try? await Task.sleep(for: .seconds(1))
+                        onRefresh()
+                    }
+                }
+            }
+
+            if showCameraPermission && permissionService.cameraState != .granted {
+                PermissionRow(
+                    title: "Camera",
+                    isGranted: false
+                ) {
+                    permissionService.openCameraSettings()
+                    Task {
+                        try? await Task.sleep(for: .seconds(1))
+                        onRefresh()
+                    }
                 }
             }
         }
@@ -334,7 +365,7 @@ struct PermissionRow: View {
                 Spacer()
 
                 if !isGranted {
-                    Text("Open Settings")
+                    Text("Open Settingsss")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }

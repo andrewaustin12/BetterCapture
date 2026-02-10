@@ -95,7 +95,8 @@ final class CaptureEngine: NSObject {
     /// - Parameters:
     ///   - settings: The settings store containing capture configuration
     ///   - videoSize: The dimensions for the captured video
-    func startCapture(with settings: SettingsStore, videoSize: CGSize) async throws {
+    ///   - excludedWindowNumbers: Optional array of window numbers to exclude from capture
+    func startCapture(with settings: SettingsStore, videoSize: CGSize, excludedWindowNumbers: [Int] = []) async throws {
         guard let filter = contentFilter else {
             throw CaptureError.noContentFilterSelected
         }
@@ -125,7 +126,7 @@ final class CaptureEngine: NSObject {
 
         // Apply content filter settings (wallpaper, dock, menu bar)
         logger.info("Applying content filter settings...")
-        let filteredContent = try await contentFilterService.applySettings(to: filter, settings: settings)
+        let filteredContent = try await contentFilterService.applySettings(to: filter, settings: settings, additionalWindowNumbers: excludedWindowNumbers)
         logger.info("Content filter applied, creating stream...")
 
         let streamConfig = createStreamConfiguration(from: settings, contentSize: videoSize)

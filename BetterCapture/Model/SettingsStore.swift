@@ -368,6 +368,82 @@ final class SettingsStore {
         }
     }
 
+    // MARK: - Camera Bubble Settings (Loom-style)
+
+    var showCameraBubble: Bool {
+        get {
+            access(keyPath: \.showCameraBubble)
+            return UserDefaults.standard.object(forKey: "showCameraBubble") as? Bool ?? true
+        }
+        set {
+            withMutation(keyPath: \.showCameraBubble) {
+                UserDefaults.standard.set(newValue, forKey: "showCameraBubble")
+            }
+        }
+    }
+
+    // MARK: - Preview Bubble Settings (legacy - screen preview)
+
+    var showPreviewBubble: Bool {
+        get {
+            access(keyPath: \.showPreviewBubble)
+            return UserDefaults.standard.object(forKey: "showPreviewBubble") as? Bool ?? true
+        }
+        set {
+            withMutation(keyPath: \.showPreviewBubble) {
+                UserDefaults.standard.set(newValue, forKey: "showPreviewBubble")
+            }
+        }
+    }
+
+    var previewBubbleCorner: ScreenCorner {
+        get {
+            access(keyPath: \.previewBubbleCorner)
+            if let rawValue = UserDefaults.standard.string(forKey: "previewBubbleCorner"),
+               let corner = ScreenCorner(rawValue: rawValue) {
+                return corner
+            }
+            return .bottomLeft
+        }
+        set {
+            withMutation(keyPath: \.previewBubbleCorner) {
+                UserDefaults.standard.set(newValue.rawValue, forKey: "previewBubbleCorner")
+            }
+        }
+    }
+
+    var previewBubbleSize: PreviewSize {
+        get {
+            access(keyPath: \.previewBubbleSize)
+            if let rawValue = UserDefaults.standard.string(forKey: "previewBubbleSize"),
+               let size = PreviewSize(rawValue: rawValue) {
+                return size
+            }
+            return .medium
+        }
+        set {
+            withMutation(keyPath: \.previewBubbleSize) {
+                UserDefaults.standard.set(newValue.rawValue, forKey: "previewBubbleSize")
+            }
+        }
+    }
+
+    var cameraBackgroundEffect: CameraBackgroundEffect {
+        get {
+            access(keyPath: \.cameraBackgroundEffect)
+            if let rawValue = UserDefaults.standard.string(forKey: "cameraBackgroundEffect"),
+               let effect = CameraBackgroundEffect(rawValue: rawValue) {
+                return effect
+            }
+            return .none
+        }
+        set {
+            withMutation(keyPath: \.cameraBackgroundEffect) {
+                UserDefaults.standard.set(newValue.rawValue, forKey: "cameraBackgroundEffect")
+            }
+        }
+    }
+
     // MARK: - Output Settings
 
     /// The default output directory (Movies/BetterCapture)

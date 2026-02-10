@@ -63,6 +63,10 @@ final class RecorderViewModel {
     let permissionService: PermissionService
     private let captureEngine: CaptureEngine
     private let assetWriter: AssetWriter
+    private let videoCompositor: VideoCompositor
+    private let previewBubbleWindow: PreviewBubbleWindow
+    private let previewBubbleService: PreviewBubbleService
+    private let cameraCaptureService: CameraCaptureService
 
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "BetterCapture", category: "RecorderViewModel")
 
@@ -82,18 +86,28 @@ final class RecorderViewModel {
         self.permissionService = PermissionService()
         self.captureEngine = CaptureEngine()
         self.assetWriter = AssetWriter()
+        self.videoCompositor = VideoCompositor()
+        self.previewBubbleWindow = PreviewBubbleWindow()
+        self.previewBubbleService = PreviewBubbleService()
+        self.cameraCaptureService = CameraCaptureService()
+
+        videoCompositor.assetWriter = assetWriter
+        videoCompositor.cameraCaptureService = cameraCaptureService
 
         captureEngine.delegate = self
-        captureEngine.sampleBufferDelegate = assetWriter
+        captureEngine.sampleBufferDelegate = videoCompositor
         previewService.delegate = self
     }
 
     // MARK: - Permission Methods
 
     /// Requests required permissions on app launch
-    /// Only requests microphone permission if microphone capture is enabled
+    /// Requests microphone if enabled, camera if camera bubble is enabled
     func requestPermissionsOnLaunch() async {
-        await permissionService.requestPermissions(includeMicrophone: settings.captureMicrophone)
+        await permissionService.requestPermissions(
+            includeMicrophone: settings.captureMicrophone,
+            includeCamera: settings.showCameraBubble
+        )
     }
 
     /// Refreshes the current permission states
@@ -138,9 +152,61 @@ final class RecorderViewModel {
             try assetWriter.startWriting()
             logger.info("AssetWriter ready")
 
+            // Configure video compositor for camera overlay
+            videoCompositor.videoSize = videoSize
+            videoCompositor.isCameraOverlayEnabled = settings.showCameraBubble
+            videoCompositor.overlayCorner = settings.previewBubbleCorner
+            videoCompositor.overlaySize = settings.previewBubbleSize.dimensions
+            if let filter = captureEngine.contentFilter {
+                videoCompositor.contentRect = filter.contentRect
+                videoCompositor.pointPixelScale = CGFloat(filter.pointPixelScale)
+            }
+            videoCompositor.bubbleFrameInScreen = nil
+
+            // Start camera bubble if enabled (Loom-style)
+            var excludedWindowNumbers: [Int] = []
+            if settings.showCameraBubble {
+                logger.info("Starting camera bubble...")
+                var hasCameraPermission = cameraCaptureService.hasPermission
+                if !hasCameraPermission {
+                    hasCameraPermission = await cameraCaptureService.requestPermission()
+                }
+                // Always show bubble when camera bubble is enabled (even if camera fails)
+                cameraCaptureService.backgroundEffect = settings.cameraBackgroundEffect
+                await cameraCaptureService.startCapture()
+                previewBubbleWindow.show(
+                    at: settings.previewBubbleCorner,
+                    size: settings.previewBubbleSize,
+                    isCameraBubble: true,
+                    initialImage: nil
+                )
+                try? await Task.sleep(for: .milliseconds(50))
+                videoCompositor.bubbleFrameInScreen = previewBubbleWindow.frameInScreenCoordinates
+                if let windowNumber = previewBubbleWindow.windowNumber {
+                    excludedWindowNumbers.append(windowNumber)
+                }
+                if !hasCameraPermission {
+                    logger.warning("Camera permission not granted, bubble will show placeholder")
+                }
+            }
+
+            // Screen preview bubble (when camera bubble is disabled)
+            if settings.showPreviewBubble && !settings.showCameraBubble {
+                logger.info("Starting screen preview bubble...")
+                if let filter = captureEngine.contentFilter {
+                    previewBubbleService.setContentFilter(filter)
+                    previewBubbleWindow.show(at: settings.previewBubbleCorner, size: settings.previewBubbleSize)
+                    try? await Task.sleep(for: .milliseconds(50))
+                    if let windowNumber = previewBubbleWindow.windowNumber {
+                        excludedWindowNumbers.append(windowNumber)
+                    }
+                    await previewBubbleService.startPreview()
+                }
+            }
+
             // Start capture with the calculated video size
             logger.info("Starting capture engine...")
-            try await captureEngine.startCapture(with: settings, videoSize: videoSize)
+            try await captureEngine.startCapture(with: settings, videoSize: videoSize, excludedWindowNumbers: excludedWindowNumbers)
 
             // Start timer
             startTimer()
@@ -160,6 +226,14 @@ final class RecorderViewModel {
 
         state = .stopping
         stopTimer()
+
+        // Hide preview/camera bubble
+        if settings.showCameraBubble || settings.showPreviewBubble {
+            logger.info("Stopping preview bubble...")
+            await previewBubbleService.stopPreview()
+            cameraCaptureService.stopCapture()
+            previewBubbleWindow.hide()
+        }
 
         do {
             // Stop capture first
@@ -210,10 +284,21 @@ final class RecorderViewModel {
         recordingStartTime = Date()
         recordingDuration = 0
 
-        recordingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        recordingTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self, let startTime = self.recordingStartTime else { return }
                 self.recordingDuration = Date().timeIntervalSince(startTime)
+                
+                // Update bubble window duration and preview image
+                if self.settings.showCameraBubble || self.settings.showPreviewBubble {
+                    self.previewBubbleWindow.updateDuration(self.formattedDuration)
+                    // Camera bubble: live feed for on-screen display and recording
+                    if self.settings.showCameraBubble {
+                        self.previewBubbleWindow.updatePreview(self.cameraCaptureService.previewImage)
+                    } else if self.settings.showPreviewBubble, let image = self.previewBubbleService.previewImage {
+                        self.previewBubbleWindow.updatePreview(image)
+                    }
+                }
             }
         }
     }
@@ -247,6 +332,11 @@ final class RecorderViewModel {
         }
 
         return CGSize(width: 1920, height: 1080)
+    }
+
+    /// Gets the preview bubble window for exclusion purposes
+    var previewBubbleWindowNumber: Int? {
+        previewBubbleWindow.windowNumber
     }
 }
 

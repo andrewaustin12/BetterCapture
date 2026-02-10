@@ -56,8 +56,9 @@ final class ContentFilterService {
     /// - Parameters:
     ///   - filter: The original filter from the content picker
     ///   - settings: User settings for content visibility
+    ///   - additionalWindowNumbers: Additional window numbers to exclude (e.g., preview bubble)
     /// - Returns: A modified filter with settings applied
-    func applySettings(to filter: SCContentFilter, settings: SettingsStore) async throws -> SCContentFilter {
+    func applySettings(to filter: SCContentFilter, settings: SettingsStore, additionalWindowNumbers: [Int] = []) async throws -> SCContentFilter {
         // Menu bar can be set directly on any filter
         filter.includeMenuBar = settings.showMenuBar
 
@@ -88,6 +89,16 @@ final class ContentFilterService {
         for window in availableWindows {
             let bundleID = window.owningApplication?.bundleIdentifier ?? ""
             let windowTitle = window.title ?? ""
+
+            // Exclude windows by window number (e.g., preview bubble)
+            // SCWindow.windowID is CGWindowID (UInt32), NSWindow.windowNumber is Int
+            // Convert both to Int for comparison
+            let windowID = Int(window.windowID)
+            if additionalWindowNumbers.contains(windowID) {
+                excludedWindows.append(window)
+                logger.debug("Excluding window by number: \(windowID)")
+                continue
+            }
 
             // Backstop is a macOS 26 layer behind wallpaper - exclude when hiding wallpaper
             // Note: Backstop may not be owned by com.apple.dock

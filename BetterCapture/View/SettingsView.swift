@@ -106,6 +106,55 @@ struct VideoSettingsView: View {
                 Toggle("Show Window Shadows", isOn: $settings.showWindowShadows)
                     .help("Include window shadows when capturing individual windows")
             }
+
+            Section("Camera Bubble (Loom-style)") {
+                Toggle("Show Camera Bubble", isOn: $settings.showCameraBubble)
+                    .help("Display your webcam in a floating bubble during recording, like Loom")
+
+                if settings.showCameraBubble {
+                    Picker("Position", selection: $settings.previewBubbleCorner) {
+                        ForEach(ScreenCorner.allCases) { corner in
+                            Text(corner.displayName).tag(corner)
+                        }
+                    }
+                    .help("Screen corner where the camera bubble appears")
+
+                    Picker("Size", selection: $settings.previewBubbleSize) {
+                        ForEach(PreviewSize.allCases) { size in
+                            Text(size.displayName).tag(size)
+                        }
+                    }
+                    .help("Size of the camera bubble")
+
+                    Picker("Background", selection: $settings.cameraBackgroundEffect) {
+                        ForEach(CameraBackgroundEffect.allCases) { effect in
+                            Text(effect.displayName).tag(effect)
+                        }
+                    }
+                    .help("FaceTime-style background effect (blur hides what's behind you)")
+                }
+            }
+
+            Section("Screen Preview Bubble") {
+                Toggle("Show Screen Preview Bubble", isOn: $settings.showPreviewBubble)
+                    .help("Display a floating preview of what's being captured (alternative to camera bubble)")
+
+                if settings.showPreviewBubble {
+                    Picker("Position", selection: $settings.previewBubbleCorner) {
+                        ForEach(ScreenCorner.allCases) { corner in
+                            Text(corner.displayName).tag(corner)
+                        }
+                    }
+                    .help("Screen corner where the preview bubble appears")
+
+                    Picker("Size", selection: $settings.previewBubbleSize) {
+                        ForEach(PreviewSize.allCases) { size in
+                            Text(size.displayName).tag(size)
+                        }
+                    }
+                    .help("Size of the preview bubble window")
+                }
+            }
         }
         .formStyle(.grouped)
         .padding()

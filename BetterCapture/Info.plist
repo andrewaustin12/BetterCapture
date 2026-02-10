@@ -8,6 +8,8 @@
 	<string>BetterCapture needs access to your microphone to record audio alongside screen captures.</string>
 	<key>NSScreenCaptureUsageDescription</key>
 	<string>BetterCapture needs access to screen recording to capture your screen content.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>BetterCapture needs access to your camera to show a picture-in-picture bubble of yourself during screen recordings, like Loom.</string>
 	<key>SUFeedURL</key>
 	<string>https://github.com/jsattler/BetterCapture/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
