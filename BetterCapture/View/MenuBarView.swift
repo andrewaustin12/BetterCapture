@@ -365,7 +365,7 @@ struct PermissionRow: View {
                 Spacer()
 
                 if !isGranted {
-                    Text("Open Settingsss")
+                    Text("Open Settings")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
